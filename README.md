@@ -1,1 +1,2 @@
-# Smart-RAG
+# SmartRAG
+Building Smart RAG System 
