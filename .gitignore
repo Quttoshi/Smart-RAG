@@ -1,28 +1,34 @@
-# Virtual Environment
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python environments
 .venv/
 venv/
 env/
 ENV/
 
-# Environment Variables (API Keys)
-.env
-.env.local
-
-# Docs
-README.md
-
-# Python Cache
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyo
+*.pyd
 
-# Vector Store (Large files)
+# Node
+node_modules/
+npm-debug.log*
+
+# Build output
+dist/
+build/
+
+# Vector store / generated data
 vector_store/
-venv/
-env/
-ENV/
-.venv
+chunks_cache.pkl
+*.cache.pkl
 
 # IDE
 .vscode/
@@ -34,33 +40,3 @@ ENV/
 .DS_Store
 Thumbs.db
 *~
-.DS_Store
-
-# Environment variables
-.env
-.env.local
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Documentation
-README.md
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Vector store / FAISS
-vector_store
-#Documentation
-README.md
-
-# Python cache
-chunks_cache.pkl
-*.cache.pkl
-
-#json files
-*.json

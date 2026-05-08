@@ -15,9 +15,10 @@ import shutil
 from utils.text_utils import clean_text
 from utils.validation_utils import validate_text
 from utils.file_utils import extract_text_from_pdf, extract_text_from_docx
+from utils.config import settings
 
 
-VECTOR_STORE_PATH = "vector_store"
+VECTOR_STORE_PATH = settings.VECTOR_STORE_PATH
 MAX_SOURCES = 5
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,10 @@ def get_redis_client():
         logger.info("Connecting to Redis...")
         try:
             _redis_client = redis.Redis(
-                host="localhost",
-                port=6379,
-                db=0,
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                db=settings.REDIS_DB,
+                password=settings.REDIS_PASSWORD if settings.REDIS_PASSWORD else None,
                 decode_responses=False,
                 socket_connect_timeout=3,
                 socket_timeout=3

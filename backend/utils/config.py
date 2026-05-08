@@ -4,35 +4,49 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import Optional
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = BACKEND_DIR.parent
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "vector_store")
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env", override=True)
 
-if not GROQ_API_KEY:
-    raise RuntimeError("GROQ_API_KEY is missing in .env")
+
+def resolve_backend_path(value: str) -> str:
+    path = Path(value)
+    if path.is_absolute():
+        return str(path)
+    return str(BACKEND_DIR / path)
+
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+VECTOR_STORE_PATH = resolve_backend_path(os.getenv("VECTOR_STORE_PATH", "vector_store"))
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY is missing in .env")
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
-    GROQ_API_KEY: str
+    OPENAI_API_KEY: str
     
-    VECTOR_STORE_PATH: str = "./vector_store"
+    VECTOR_STORE_PATH: str = VECTOR_STORE_PATH
     
     # Redis Configuration
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PASSWORD: Optional[str] = None
+
+    # CORS
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
     
     # RAG Settings
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
     TOP_K_RESULTS: int = 3
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
+    LLM_MODEL: str = "gpt-4o-mini"
     
     # Authentication
     SECRET_KEY: str = "change-this-to-a-secure-secret-key-min-32-characters"
@@ -45,8 +59,9 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@example.com"
     
     class Config:
-        env_file = ".env"
+        env_file = str(BACKEND_DIR / ".env")
         case_sensitive = True
         extra = "allow"
 
 settings = Settings()
+settings.VECTOR_STORE_PATH = resolve_backend_path(settings.VECTOR_STORE_PATH)

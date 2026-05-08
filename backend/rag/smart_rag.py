@@ -2,7 +2,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from openai import OpenAI
 from typing import Dict, Any
 
-from utils.config import GROQ_API_KEY, VECTOR_STORE_PATH
+from utils.config import OPENAI_API_KEY, VECTOR_STORE_PATH, settings
 from utils.faiss_utils import load_faiss_store
 from utils.logger import setup_logger
 
@@ -25,8 +25,7 @@ class SmartRAG:
         self.vector_store = None
 
         self.client = OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1"
+            api_key=OPENAI_API_KEY
         )
         
         # Initialize query cache using existing Redis connection
@@ -103,7 +102,7 @@ Answer:
 """
 
         response = self.client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": "Answer strictly from context."},
                 {"role": "user", "content": prompt}

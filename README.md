@@ -8,7 +8,7 @@ A production-ready Retrieval Augmented Generation (RAG) system built with **Fast
 - **Vector Search**: High-performance semantic search using FAISS vector database
 - **Intelligent Caching**: Redis-based caching layer for optimized performance
 - **JWT Authentication**: Secure API endpoints with token-based authentication
-- **LLM Integration**: Built-in support for Groq API with LangChain
+- **LLM Integration**: Built-in support for OpenAI-compatible chat completions
 - **Embeddings**: Sentence Transformers for high-quality vector embeddings
 - **REST API**: Comprehensive FastAPI endpoints for all RAG operations
 
@@ -18,7 +18,7 @@ A production-ready Retrieval Augmented Generation (RAG) system built with **Fast
 - **RAG Pipeline**: LangChain & LangChain-Community
 - **Vector Database**: FAISS
 - **Embeddings**: Sentence Transformers
-- **LLM**: Groq API
+- **LLM**: OpenAI API
 - **Authentication**: JWT (python-jose)
 - **Caching**: Redis
 - **Server**: Uvicorn
@@ -62,7 +62,7 @@ smart-rag/
 ### Prerequisites
 - Python 3.8+
 - Redis server
-- Groq API key
+- OpenAI API key
 
 ### Setup
 
@@ -86,7 +86,8 @@ smart-rag/
 4. **Configure environment**
    Create a `.env` file in the root directory:
    ```env
-   GROQ_API_KEY=your_groq_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here
+   LLM_MODEL=gpt-4o-mini
    VECTOR_STORE_PATH=./vector_store
    REDIS_HOST=localhost
    REDIS_PORT=6379
@@ -97,10 +98,32 @@ smart-rag/
 
 ### Start the server
 ```bash
-python main.py
+cd backend
+uv run uvicorn main:app --reload
 ```
 
 The API will be available at `http://localhost:8000`
+
+### Docker
+
+Create `backend/.env` from `backend/.env.example`, then set your real `OPENAI_API_KEY`.
+
+Run the full stack:
+
+```bash
+docker compose up --build
+```
+
+Services:
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
+- Redis: `localhost:6379`
+
+For backend-only Docker development with reload:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
 
 ### Interactive API Documentation
 - Swagger UI: `http://localhost:8000/docs`
