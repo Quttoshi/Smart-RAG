@@ -1,199 +1,279 @@
-# Smart RAG 🚀
+# Smart RAG
 
-A production-ready Retrieval Augmented Generation (RAG) system built with **FastAPI**, **LangChain**, and **FAISS**. This system enables intelligent document ingestion, semantic search, and context-aware query responses using modern LLMs.
+Smart RAG is a full-stack Retrieval Augmented Generation app with a FastAPI backend and a React chatbot frontend. Users can register, log in, upload documents or raw text, ask questions, and inspect retrieved source context.
 
-## Features ✨
+## Features
 
-- **Document Ingestion**: Process and index documents (PDF, DOCX, TXT) with automatic text splitting
-- **Vector Search**: High-performance semantic search using FAISS vector database
-- **Intelligent Caching**: Redis-based caching layer for optimized performance
-- **JWT Authentication**: Secure API endpoints with token-based authentication
-- **LLM Integration**: Built-in support for OpenAI-compatible chat completions
-- **Embeddings**: Sentence Transformers for high-quality vector embeddings
-- **REST API**: Comprehensive FastAPI endpoints for all RAG operations
+- Document ingestion for TXT, PDF, and DOCX files
+- Raw text ingestion
+- Chatbot-first RAG interface
+- FAISS vector search
+- Sentence Transformers embeddings
+- OpenAI chat completion support
+- Redis-backed users, metadata, and query cache
+- JWT authentication
+- Source/context inspection in the frontend
+- Docker setup for local full-stack testing
 
-## Tech Stack 🛠️
+## Tech Stack
 
-- **Framework**: FastAPI
-- **RAG Pipeline**: LangChain & LangChain-Community
-- **Vector Database**: FAISS
-- **Embeddings**: Sentence Transformers
-- **LLM**: OpenAI API
-- **Authentication**: JWT (python-jose)
-- **Caching**: Redis
-- **Server**: Uvicorn
-- **Validation**: Pydantic
+**Backend**
+- FastAPI
+- LangChain
+- FAISS
+- Sentence Transformers
+- OpenAI API
+- Redis
+- JWT auth
+- Uvicorn
 
-## Project Structure 📁
+**Frontend**
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- TanStack Query
+- Axios
+- Lucide React
 
+## Project Structure
+
+```txt
+Smart-RAG/
+├── backend/
+│   ├── api/
+│   ├── app/
+│   ├── auth/
+│   ├── rag/
+│   ├── scripts/
+│   ├── smart_rag/
+│   ├── utils/
+│   ├── .env.example
+│   ├── Dockerfile
+│   ├── main.py
+│   └── requirements.txt
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   ├── .env.example
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── package.json
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── .gitignore
+└── README.md
 ```
-smart-rag/
-├── api/                      # API routes
-│   ├── auth_routes.py       # Authentication endpoints
-│   ├── ingest_routes.py     # Document ingestion
-│   └── query_routes.py      # Query and retrieval endpoints
-├── auth/                     # Authentication & security
-│   ├── jwt_handler.py       # JWT token management
-│   ├── password_handler.py  # Password hashing & validation
-│   ├── user_manager.py      # User management
-│   └── models.py            # Auth data models
-├── rag/                      # RAG core logic
-│   └── smart_rag.py        # Main RAG pipeline
-├── smart_rag/               # RAG utilities
-│   ├── ingest.py           # Document ingestion logic
-│   └── redis_cache.py      # Redis caching layer
-├── utils/                    # Utility modules
-│   ├── config.py           # Configuration settings
-│   ├── faiss_utils.py      # FAISS operations
-│   ├── file_utils.py       # File processing
-│   ├── logger.py           # Logging setup
-│   ├── redis_client.py     # Redis client
-│   ├── text_utils.py       # Text processing
-│   └── validation_utils.py # Validation helpers
-├── scripts/                  # Utility scripts
-│   └── init_admin.py       # Admin initialization
-├── main.py                  # FastAPI application entry
-├── requirements.txt         # Python dependencies
-└── README.md               # This file
-```
 
-## Installation 📦
+## Prerequisites
 
-### Prerequisites
-- Python 3.8+
-- Redis server
+- Python 3.12+
+- uv
+- Node.js 24+
+- npm
+- Redis
 - OpenAI API key
+- Docker, optional
 
-### Setup
+## Backend Setup
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/smart-rag.git
-   cd smart-rag
-   ```
+From the project root:
 
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment**
-   Create a `.env` file in the root directory:
-   ```env
-   OPENAI_API_KEY=your_openai_api_key_here
-   LLM_MODEL=gpt-4o-mini
-   VECTOR_STORE_PATH=./vector_store
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   REDIS_PASSWORD=optional_password
-   ```
-
-## Usage 🚀
-
-### Start the server
-```bash
+```powershell
 cd backend
+uv venv
+uv pip install -r requirements.txt
+```
+
+Create `backend/.env` from `backend/.env.example`:
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+LLM_MODEL=gpt-4o-mini
+VECTOR_STORE_PATH=./vector_store
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
+SECRET_KEY=change-this-to-a-secure-secret-key-min-32-characters
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+ADMIN_EMAIL=admin@example.com
+```
+
+Start the backend:
+
+```powershell
 uv run uvicorn main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
+Backend URL:
 
-### Docker
+```txt
+http://localhost:8000
+```
 
-Create `backend/.env` from `backend/.env.example`, then set your real `OPENAI_API_KEY`.
+API docs:
 
-Run the full stack:
+```txt
+http://localhost:8000/docs
+```
 
-```bash
+## Frontend Setup
+
+In another terminal:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend URL:
+
+```txt
+http://localhost:5173
+```
+
+The frontend defaults to:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+To override it, create `frontend/.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+## Docker
+
+Create `backend/.env` first, then run from the project root:
+
+```powershell
 docker compose up --build
 ```
 
 Services:
+
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
 - Redis: `localhost:6379`
 
-For backend-only Docker development with reload:
+For backend Docker development with reload:
 
-```bash
+```powershell
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-### Interactive API Documentation
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+## API Endpoints
 
-### Initialize Admin User
-```bash
-python scripts/init_admin.py
-```
+### Health
 
-## API Endpoints 📡
+- `GET /api/health`
 
 ### Authentication
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login and get JWT token
-- `POST /auth/refresh` - Refresh JWT token
 
-### Document Ingestion
-- `POST /ingest/documents` - Upload and process documents
-- `GET /ingest/documents` - List indexed documents
-- `DELETE /ingest/documents/{doc_id}` - Delete document
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/auth/users`
+- `DELETE /api/auth/users/{user_id}`
 
-### Query & Retrieval
-- `POST /query/search` - Semantic search across documents
-- `POST /query/rag` - Full RAG query with LLM response
-- `GET /query/sources/{query_id}` - Get sources for a query
+### Ingestion
 
-## Configuration ⚙️
+- `POST /ingest/upload-text`
+- `POST /ingest/upload-file`
+- `GET /ingest/sources`
+- `DELETE /ingest/clear-all`
 
-Edit `utils/config.py` to customize:
-- FAISS index parameters
-- Text splitting strategies
-- Redis cache TTL
-- LLM model selection
-- Embedding model
+### Query
 
-## Development 💻
+- `POST /api/query`
+- `GET /api/cache/stats`
 
-### Run tests
-```bash
-pytest
+## Admin User
+
+After Redis and the backend environment are configured:
+
+```powershell
+cd backend
+uv run python scripts/init_admin.py
 ```
 
-### Code formatting
-```bash
-black .
-isort .
+## Deployment Notes
+
+Frontend and backend are intended to deploy separately.
+
+Recommended setup:
+
+- Frontend: Vercel or Netlify
+- Backend: Render, Railway, or Fly.io
+- Redis: Upstash Redis or managed Redis from your backend host
+- Vector store: persistent backend disk for MVP, hosted vector DB later
+
+Frontend deployment env:
+
+```env
+VITE_API_BASE_URL=https://your-backend-domain.com
 ```
 
-### Type checking
-```bash
-mypy .
+Backend deployment env:
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+LLM_MODEL=gpt-4o-mini
+REDIS_HOST=your_redis_host
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+VECTOR_STORE_PATH=/app/vector_store
+CORS_ORIGINS=https://your-frontend-domain.com
+SECRET_KEY=your_secret_key
 ```
 
-## Contributing 🤝
+For production, make sure `VECTOR_STORE_PATH` points to persistent storage. If the backend host uses ephemeral storage, uploaded/indexed documents may disappear after restarts.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Useful Commands
 
-## License 📄
+Backend:
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+```powershell
+cd backend
+uv run uvicorn main:app --reload
+```
 
-## Support 💬
+Frontend:
 
-For issues, questions, or suggestions, please open an issue on GitHub.
+```powershell
+cd frontend
+npm run dev
+```
 
----
+Frontend build:
 
-**Built using FastAPI & LangChain** 
+```powershell
+cd frontend
+npm run build
+```
+
+Docker:
+
+```powershell
+docker compose up --build
+```
+
+## Git Safety
+
+Do not commit real environment files:
+
+- `backend/.env`
+- `frontend/.env`
+
+Use `.env.example` files for shared configuration templates.
+
+## License
+
+MIT
