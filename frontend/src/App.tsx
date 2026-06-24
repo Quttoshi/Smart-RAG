@@ -1,19 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bot,
-  CheckCircle2,
   Database,
   FileText,
   Loader2,
+  X,
   LogOut,
-  MessageSquareText,
-  RefreshCw,
+  PanelLeft,
+  Plus,
   Send,
-  Settings2,
   ShieldCheck,
-  Upload,
 } from 'lucide-react'
 import axios from 'axios'
 import { twMerge } from 'tailwind-merge'
@@ -45,18 +43,6 @@ type QueryResponse = {
   num_sources: number
   sources?: string[]
   cached: boolean
-}
-
-type SourceListResponse = {
-  success: boolean
-  data: unknown
-}
-
-type CacheStats = {
-  cached_queries: number
-  max_queries: number
-  ttl_seconds?: number
-  recent_queries: Array<Record<string, unknown>>
 }
 
 type ChatMessage = {
@@ -95,20 +81,6 @@ function getErrorMessage(error: unknown) {
   return 'Something went wrong'
 }
 
-function compactData(value: unknown) {
-  if (!value) return []
-  if (Array.isArray(value)) return value
-  if (typeof value === 'object') {
-    const objectValue = value as Record<string, unknown>
-    for (const key of ['sources', 'current_sources', 'documents', 'items']) {
-      const maybeList = objectValue[key]
-      if (Array.isArray(maybeList)) return maybeList
-    }
-    return Object.entries(objectValue).map(([key, item]) => ({ key, item }))
-  }
-  return [value]
-}
-
 function App() {
   const queryClient = useQueryClient()
   const [authMode, setAuthMode] = useState<AuthMode>('login')
@@ -122,12 +94,12 @@ function App() {
         'Upload a document or paste text, then ask me questions grounded in your sources.',
     },
   ])
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [question, setQuestion] = useState('')
-  const [textUpload, setTextUpload] = useState('')
-  const [sourceCount, setSourceCount] = useState(3)
-  const [useCache, setUseCache] = useState(true)
-  const [activeSource, setActiveSource] = useState<string | null>(null)
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [hasStarted, setHasStarted] = useState(false)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [accessToken, setAccessToken] = useState(() =>
     localStorage.getItem(ACCESS_TOKEN_KEY),
   )
@@ -144,32 +116,6 @@ function App() {
     retry: false,
   })
 
-  const healthQuery = useQuery({
-    queryKey: ['health'],
-    queryFn: async () => {
-      const response = await api.get<{ status: string }>('/api/health')
-      return response.data
-    },
-    retry: false,
-  })
-
-  const sourcesQuery = useQuery({
-    queryKey: ['sources'],
-    queryFn: async () => {
-      const response = await api.get<SourceListResponse>('/ingest/sources')
-      return response.data
-    },
-    retry: false,
-  })
-
-  const cacheQuery = useQuery({
-    queryKey: ['cache-stats'],
-    queryFn: async () => {
-      const response = await api.get<CacheStats>('/api/cache/stats')
-      return response.data
-    },
-    retry: false,
-  })
 
   const authMutation = useMutation({
     mutationFn: async () => {
@@ -208,8 +154,8 @@ function App() {
     mutationFn: async (prompt: string) => {
       const response = await api.post<QueryResponse>('/api/query', {
         question: prompt,
-        k: sourceCount,
-        use_cache: useCache,
+        k: 3,
+        use_cache: true,
       })
       return response.data
     },
@@ -229,7 +175,6 @@ function App() {
           cached: data.cached,
         },
       ])
-      setActiveSource(sources[0] ?? null)
       queryClient.invalidateQueries({ queryKey: ['cache-stats'] })
     },
     onError: (error) => {
@@ -244,18 +189,6 @@ function App() {
     },
   })
 
-  const textUploadMutation = useMutation({
-    mutationFn: async () => {
-      const response = await api.post('/ingest/upload-text', { text: textUpload })
-      return response.data
-    },
-    onSuccess: (data) => {
-      setUploadStatus(data.message ?? 'Text ingested successfully')
-      setTextUpload('')
-      queryClient.invalidateQueries({ queryKey: ['sources'] })
-    },
-  })
-
   const fileUploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData()
@@ -263,28 +196,7 @@ function App() {
       const response = await api.post('/ingest/upload-file', formData)
       return response.data
     },
-    onSuccess: (data) => {
-      setUploadStatus(data.message ?? 'File ingested successfully')
-      queryClient.invalidateQueries({ queryKey: ['sources'] })
-    },
   })
-
-  const clearSourcesMutation = useMutation({
-    mutationFn: async () => {
-      const response = await api.delete('/ingest/clear-all')
-      return response.data
-    },
-    onSuccess: () => {
-      setUploadStatus('All sources cleared')
-      queryClient.invalidateQueries({ queryKey: ['sources'] })
-      setActiveSource(null)
-    },
-  })
-
-  const sourceItems = useMemo(
-    () => compactData(sourcesQuery.data?.data),
-    [sourcesQuery.data],
-  )
 
   function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -292,16 +204,31 @@ function App() {
     authMutation.mutate()
   }
 
-  function handleAsk(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  function submitQuestion() {
     const prompt = question.trim()
-    if (!prompt) return
+    if (!prompt || queryMutation.isPending) return
+    setHasStarted(true)
+    setAttachedFile(null)
     setMessages((current) => [
       ...current,
       { id: crypto.randomUUID(), role: 'user', content: prompt },
     ])
     setQuestion('')
+    if (textareaRef.current) textareaRef.current.style.height = '52px'
     queryMutation.mutate(prompt)
+  }
+
+  function handleNewChat() {
+    setHasStarted(false)
+    setAttachedFile(null)
+    setMessages([{ id: 'welcome', role: 'assistant', content: 'Upload a document or paste text, then ask me questions grounded in your sources.' }])
+    setQuestion('')
+    if (textareaRef.current) textareaRef.current.style.height = '52px'
+  }
+
+  function handleAsk(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    submitQuestion()
   }
 
   function handleLogout() {
@@ -319,8 +246,7 @@ function App() {
           'Upload a document or paste text, then ask me questions grounded in your sources.',
       },
     ])
-    setActiveSource(null)
-    setUploadStatus(null)
+    setHasStarted(false)
     queryClient.clear()
   }
 
@@ -448,235 +374,181 @@ function App() {
   }
 
   return (
-    <main className="flex h-screen overflow-hidden bg-[#eef2f5] text-[#17202a]">
-      <aside className="hidden h-screen w-80 shrink-0 overflow-hidden border-r border-[#d8dee5] bg-white p-4 lg:flex lg:flex-col">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-[#14213d] text-white">
-            <Bot size={21} />
-          </div>
-          <div>
-            <p className="font-semibold">Smart RAG</p>
-            <p className="text-xs text-[#6b7a89]">Document chatbot</p>
+    <main className="flex h-screen overflow-hidden bg-[#171717] text-white">
+      {/* Sidebar */}
+      <aside className={twMerge('h-screen shrink-0 overflow-hidden border-r border-white/10 bg-[#212121] flex flex-col transition-[width] duration-300', sidebarOpen ? 'w-64' : 'w-14')}>
+        {/* Toggle row */}
+        <div className="flex items-center gap-3 px-3 pt-3 pb-1">
+          <button
+            title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+            type="button"
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-white/40 hover:text-white hover:bg-white/10"
+          >
+            <PanelLeft size={17} />
+          </button>
+          <div className={twMerge('flex items-center gap-2 whitespace-nowrap transition-opacity duration-200', sidebarOpen ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none')}>
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[#2ec4b6] text-[#07151b]">
+              <Bot size={13} />
+            </div>
+            <p className="font-semibold text-white text-sm">Smart RAG</p>
           </div>
         </div>
 
-        <section className="rounded-[8px] border border-[#d8dee5] p-3">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Sources</h2>
-            <button
-              title="Refresh sources"
-              type="button"
-              onClick={() => sourcesQuery.refetch()}
-              className="rounded-[6px] p-1.5 text-[#607080] hover:bg-[#edf2f7]"
-            >
-              <RefreshCw size={15} />
-            </button>
-          </div>
-          <div className="max-h-32 space-y-2 overflow-auto">
-            {sourceItems.length === 0 ? (
-              <p className="text-sm text-[#6b7a89]">No sources indexed yet.</p>
+        {/* New chat row */}
+        <div className="flex items-center gap-3 px-3 mt-4 mb-2">
+          <button
+            type="button"
+            onClick={handleNewChat}
+            title="New chat"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-white/10 hover:bg-white/15 text-white/70 hover:text-white transition-colors"
+          >
+            <Plus size={16} />
+          </button>
+          <span className={twMerge('text-sm text-white/60 whitespace-nowrap transition-opacity duration-200', sidebarOpen ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none')}>New chat</span>
+        </div>
+
+        {/* Recents */}
+        <div className={twMerge('flex flex-1 flex-col overflow-hidden px-3 whitespace-nowrap transition-opacity duration-200', sidebarOpen ? 'opacity-100 delay-150' : 'opacity-0 pointer-events-none')}>
+          <p className="mt-4 mb-2 text-xs font-semibold uppercase tracking-wide text-white/30">Recents</p>
+          <div className="flex-1 space-y-1 overflow-auto">
+            {messages.filter((m) => m.role === 'user').length === 0 ? (
+              <p className="text-xs text-white/25 whitespace-normal">No questions yet.</p>
             ) : (
-              sourceItems.map((source, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => setActiveSource(JSON.stringify(source, null, 2))}
-                  className="w-full rounded-[6px] border border-[#e4eaf0] px-3 py-2 text-left text-xs text-[#435262] hover:border-[#2ec4b6]"
-                >
-                  <span className="line-clamp-2">
-                    {typeof source === 'string'
-                      ? source
-                      : JSON.stringify(source).slice(0, 110)}
-                  </span>
-                </button>
+              messages.filter((m) => m.role === 'user').map((m) => (
+                <div key={m.id} className="rounded-[8px] px-2 py-2 text-xs text-white/60 bg-white/5 line-clamp-2 hover:bg-white/10 cursor-default whitespace-normal">
+                  {m.content}
+                </div>
               ))
             )}
           </div>
-        </section>
-
-        <section className="mt-4 min-h-0 rounded-[8px] border border-[#d8dee5] p-3">
-          <h2 className="mb-3 text-sm font-semibold">Add Knowledge</h2>
-          <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-dashed border-[#aab7c4] px-3 py-3 text-sm text-[#435262] hover:border-[#2ec4b6]">
-            <Upload size={17} />
-            Upload file
-            <input
-              type="file"
-              className="hidden"
-              accept=".txt,.pdf,.docx"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) fileUploadMutation.mutate(file)
-                event.currentTarget.value = ''
-              }}
-            />
-          </label>
-          <textarea
-            value={textUpload}
-            onChange={(event) => setTextUpload(event.target.value)}
-            rows={4}
-            placeholder="Paste raw text to ingest..."
-            className="w-full resize-none rounded-[8px] border border-[#cfd8e3] px-3 py-2 text-sm outline-none focus:border-[#2ec4b6]"
-          />
-          <button
-            type="button"
-            onClick={() => textUploadMutation.mutate()}
-            disabled={!textUpload.trim() || textUploadMutation.isPending}
-            className="mt-2 w-full rounded-[8px] bg-[#2ec4b6] px-3 py-2 text-sm font-semibold text-[#07151b] disabled:opacity-60"
-          >
-            Ingest text
-          </button>
-          {uploadStatus && (
-            <p className="mt-3 flex items-start gap-2 rounded-[8px] bg-[#ecfdf5] px-3 py-2 text-xs text-[#047857]">
-              <CheckCircle2 size={15} /> {uploadStatus}
-            </p>
-          )}
-        </section>
-
-        <button
-          type="button"
-          onClick={() => clearSourcesMutation.mutate()}
-          className="mt-3 rounded-[8px] border border-[#d8dee5] px-3 py-2 text-sm text-[#607080] hover:border-[#ef476f] hover:text-[#be123c]"
-        >
-          Clear all sources
-        </button>
+        </div>
       </aside>
 
+      {/* Main */}
       <section className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-[#d8dee5] bg-white px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold">Chat</p>
-            <p className="text-xs text-[#6b7a89]">
-              {meQuery.data?.username ?? 'Signed in'} · API{' '}
-              {healthQuery.data?.status === 'ok' ? 'online' : 'checking'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 rounded-[8px] border border-[#d8dee5] px-3 py-2 text-sm">
-              <Settings2 size={15} />
-              k
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={sourceCount}
-                onChange={(event) => setSourceCount(Number(event.target.value))}
-                className="w-10 bg-transparent outline-none"
-              />
-            </label>
-            <label className="flex items-center gap-2 rounded-[8px] border border-[#d8dee5] px-3 py-2 text-sm">
-              Cache
-              <input
-                type="checkbox"
-                checked={useCache}
-                onChange={(event) => setUseCache(event.target.checked)}
-              />
-            </label>
-            <button
-              title="Log out"
-              type="button"
-              onClick={handleLogout}
-              className="rounded-[8px] border border-[#d8dee5] p-2 text-[#607080] hover:bg-white"
-            >
-              <LogOut size={17} />
-            </button>
-          </div>
+        <header className="shrink-0 flex items-center justify-end px-4 py-3 border-b border-white/10">
+          <button
+            title="Log out"
+            type="button"
+            onClick={handleLogout}
+            className="rounded-[8px] p-2 text-white/40 hover:text-white hover:bg-white/10"
+          >
+            <LogOut size={17} />
+          </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="flex min-h-0 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 space-y-3 overflow-auto p-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.pdf,.docx"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) { setAttachedFile(file); fileUploadMutation.mutate(file) }
+            event.currentTarget.value = ''
+          }}
+        />
+
+        {hasStarted ? (
+          <>
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-6 space-y-4">
               {messages.map((message) => (
                 <article
                   key={message.id}
                   className={twMerge(
-                    'max-w-3xl rounded-[8px] border px-4 py-3 text-sm leading-6 shadow-sm',
+                    'max-w-2xl mx-auto rounded-2xl px-4 py-3 text-base leading-7',
                     message.role === 'user'
-                      ? 'ml-auto border-[#b8d8d8] bg-[#e8fbf8]'
-                      : 'border-[#d8dee5] bg-white',
+                      ? 'ml-auto bg-[#2f2f2f] text-[#e5e7eb]'
+                      : 'text-[#e5e7eb]',
                   )}
                 >
-                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#607080]">
-                    {message.role === 'assistant' ? (
-                      <Bot size={14} />
-                    ) : (
-                      <MessageSquareText size={14} />
-                    )}
-                    {message.role}
-                    {message.cached && (
-                      <span className="rounded-full bg-[#fff3cd] px-2 py-0.5 text-[#8a6100]">
-                        cached
-                      </span>
-                    )}
-                  </div>
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                  {message.sources?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {message.sources.map((source, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          onClick={() => setActiveSource(source)}
-                          className="rounded-full border border-[#cfd8e3] px-3 py-1 text-xs text-[#435262] hover:border-[#2ec4b6]"
-                        >
-                          Source {index + 1}
-                        </button>
-                      ))}
+                  {message.role === 'assistant' && (
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-white/40">
+                      <Bot size={13} /> Assistant
                     </div>
-                  ) : null}
+                  )}
+                  <p className="whitespace-pre-wrap">{message.content}</p>
                 </article>
               ))}
               {queryMutation.isPending && (
-                <div className="flex max-w-3xl items-center gap-2 rounded-[8px] border border-[#d8dee5] bg-white px-4 py-3 text-sm text-[#607080]">
-                  <Loader2 className="animate-spin" size={17} />
-                  Retrieving context and drafting an answer...
+                <div className="max-w-2xl mx-auto flex items-center gap-2 text-sm text-white/30">
+                  <Loader2 className="animate-spin" size={15} /> Thinking…
+                </div>
+              )}
+              {fileUploadMutation.isPending && (
+                <div className="max-w-2xl mx-auto flex items-center gap-2 text-sm text-white/30">
+                  <Loader2 className="animate-spin" size={15} /> Uploading file…
                 </div>
               )}
             </div>
 
-            <form onSubmit={handleAsk} className="shrink-0 border-t border-[#d8dee5] bg-white p-3">
-              <div className="flex gap-3">
+            <div className="shrink-0 px-4 pb-4 pt-2">
+              <form onSubmit={handleAsk} className="mx-auto max-w-2xl">
+                {attachedFile && (
+                  <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 w-fit ml-2">
+                    <FileText size={13} className="text-white/50 shrink-0" />
+                    <span className="text-xs text-white/70 truncate max-w-[200px]">{attachedFile.name}</span>
+                    <button type="button" onClick={() => setAttachedFile(null)} className="text-white/40 hover:text-white ml-1"><X size={12} /></button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 rounded-full bg-[#2f2f2f] border border-[#555555] px-3 py-2">
+                  <button type="button" title="Upload file" onClick={() => fileInputRef.current?.click()} disabled={fileUploadMutation.isPending} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30">
+                    <Plus size={20} />
+                  </button>
+                  <textarea
+                    ref={textareaRef}
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onInput={(e) => { const el = e.currentTarget; el.style.height = '28px'; el.style.height = `${el.scrollHeight}px` }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion() } }}
+                    rows={1}
+                    placeholder="Ask a follow-up…"
+                    className="flex-1 bg-transparent text-white/90 placeholder-white/30 resize-none overflow-hidden outline-none text-sm leading-7"
+                    style={{ minHeight: '28px', maxHeight: '160px' }}
+                  />
+                  <button type="submit" disabled={!question.trim() || queryMutation.isPending} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#212121] disabled:opacity-20" title="Send">
+                    <Send size={14} />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center px-4 pb-32">
+            <h1 className="mb-6 text-2xl font-semibold text-white/80">
+              {meQuery.data?.username && <span>{meQuery.data.username}, </span>}How can I help you today?
+            </h1>
+            <form onSubmit={handleAsk} className="w-full max-w-2xl">
+              {attachedFile && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 w-fit ml-2">
+                  <FileText size={13} className="text-white/50 shrink-0" />
+                  <span className="text-xs text-white/70 truncate max-w-[200px]">{attachedFile.name}</span>
+                  <button type="button" onClick={() => setAttachedFile(null)} className="text-white/40 hover:text-white ml-1"><X size={12} /></button>
+                </div>
+              )}
+              <div className="flex items-center gap-2 rounded-full bg-[#2f2f2f] border border-[#555555] px-3 py-2">
+                <button type="button" title="Upload file" onClick={() => fileInputRef.current?.click()} disabled={fileUploadMutation.isPending} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/40 hover:text-white hover:bg-white/10 disabled:opacity-30">
+                  {fileUploadMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : <Plus size={20} />}
+                </button>
                 <textarea
+                  ref={textareaRef}
                   value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onInput={(e) => { const el = e.currentTarget; el.style.height = '28px'; el.style.height = `${el.scrollHeight}px` }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion() } }}
                   rows={1}
-                  placeholder="Ask a question about your indexed documents..."
-                  className="h-12 flex-1 resize-none rounded-[8px] border border-[#cfd8e3] px-3 py-3 text-sm outline-none focus:border-[#2ec4b6]"
+                  placeholder="Ask anything about your documents…"
+                  className="flex-1 bg-transparent text-white/90 placeholder-white/30 resize-none overflow-hidden outline-none text-sm leading-7"
+                  style={{ minHeight: '28px', maxHeight: '160px' }}
                 />
-                <button
-                  type="submit"
-                  disabled={!question.trim() || queryMutation.isPending}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] bg-[#14213d] text-white disabled:opacity-60"
-                  title="Send question"
-                >
-                  <Send size={18} />
+                <button type="submit" disabled={!question.trim() || queryMutation.isPending} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#212121] disabled:opacity-20" title="Send">
+                  <Send size={14} />
                 </button>
               </div>
             </form>
-          </section>
-
-          <aside className="hidden min-h-0 overflow-hidden border-l border-[#d8dee5] bg-white p-4 lg:flex lg:flex-col">
-            <div className="mb-4 shrink-0 rounded-[8px] border border-[#d8dee5] p-3">
-              <h2 className="mb-2 text-sm font-semibold">System</h2>
-              <div className="grid gap-2 text-xs text-[#607080]">
-                <span>API status: {healthQuery.data?.status ?? 'unknown'}</span>
-                <span>
-                  Cache: {cacheQuery.data?.cached_queries ?? 0}/
-                  {cacheQuery.data?.max_queries ?? 0} queries
-                </span>
-                <span>Sources indexed: {sourceItems.length}</span>
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col rounded-[8px] border border-[#d8dee5]">
-              <div className="border-b border-[#d8dee5] px-3 py-2">
-                <h2 className="text-sm font-semibold">Retrieved Context</h2>
-              </div>
-              <pre className="min-h-0 flex-1 whitespace-pre-wrap overflow-auto p-3 text-xs leading-5 text-[#435262]">
-                {activeSource ?? 'Select a source from an answer to inspect it here.'}
-              </pre>
-            </div>
-          </aside>
-        </div>
+          </div>
+        )}
       </section>
     </main>
   )
