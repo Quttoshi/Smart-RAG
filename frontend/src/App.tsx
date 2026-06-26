@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -100,9 +100,14 @@ function App() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const [accessToken, setAccessToken] = useState(() =>
     localStorage.getItem(ACCESS_TOKEN_KEY),
   )
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const isAuthed = Boolean(accessToken)
 
@@ -481,6 +486,7 @@ function App() {
                   <Loader2 className="animate-spin" size={15} /> Uploading file…
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="shrink-0 px-4 pb-4 pt-2">
