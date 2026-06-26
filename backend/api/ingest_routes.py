@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from smart_rag.ingest import (
-    ingest_raw_text, 
+    ingest_raw_text,
     ingest_file_content,
     get_current_sources,
     clear_all_sources
@@ -73,6 +73,9 @@ def upload_and_ingest(payload: RawTextInput):
 async def upload_file(file: UploadFile = File(...)):
     """Upload and ingest a file (.txt, .pdf, .docx)"""
     try:
+        # Clear previous data so answers come only from the new file
+        clear_all_sources()
+
         content = await file.read()
         result = ingest_file_content(content, file.filename)
 

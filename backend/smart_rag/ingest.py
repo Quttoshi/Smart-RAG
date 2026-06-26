@@ -16,6 +16,7 @@ from utils.text_utils import clean_text
 from utils.validation_utils import validate_text
 from utils.file_utils import extract_text_from_pdf, extract_text_from_docx
 from utils.config import settings
+from utils.faiss_utils import faiss_index_exists
 
 
 VECTOR_STORE_PATH = settings.VECTOR_STORE_PATH
@@ -325,7 +326,7 @@ def ingest_raw_text(raw_text: str, source_name: str = "api"):
             vector_store.add_documents(chunks)
 
     else:
-        if os.path.exists(VECTOR_STORE_PATH):
+        if faiss_index_exists(VECTOR_STORE_PATH):
             vector_store = FAISS.load_local(
                 VECTOR_STORE_PATH,
                 embeddings,
